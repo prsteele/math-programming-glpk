@@ -24,8 +24,7 @@ dependencies:
   - glpk-hs >= 0.1.0.0 && < 0.2
   - mtl >= 2.2.2 && < 2.3
   - containers >= 0.5.11 && < 0.6
-  - MathProgHs
-  - glpk-hs
+  - math-programming
 
 library:
   source-dirs: src

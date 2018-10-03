@@ -1,3 +1,4 @@
 .stack-work/
 math-programming-glpk.cabal
+local-stack.yaml
 *~
