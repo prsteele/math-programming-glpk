@@ -27,6 +27,8 @@ dependencies:
   - math-programming
 
 library:
+  ghc-options:
+    - -Wall
   source-dirs: src
 
 executables:
