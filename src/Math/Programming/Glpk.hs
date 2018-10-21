@@ -51,9 +51,11 @@ instance LPMonad Glpk Double where
 
   addVariable = addVariable'
   nameVariable = nameVariable'
+  variableName = variableName'
   deleteVariable = deleteVariable'
   addConstraint = addConstraint'
   nameConstraint = nameConstraint'
+  constraintName = constraintName'
   deleteConstraint = deleteConstraint'
   setObjective = setObjective'
   setSense = setSense'
@@ -194,6 +196,12 @@ nameVariable' variable name = do
     column <- readColumn variable
     liftIO $ withCString name (glp_set_col_name problem column)
 
+variableName' :: Variable Glpk -> Glpk String
+variableName' variable = do
+  problem <- askProblem
+  column <- readColumn variable
+  liftIO $ glp_get_col_name problem column >>= peekCString
+
 deleteVariable' :: Variable Glpk -> Glpk ()
 deleteVariable' variable = do
   problem <- askProblem
@@ -247,6 +255,12 @@ nameConstraint' constraintId name = do
   problem <- askProblem
   row <- readRow constraintId
   liftIO $ withCString name (glp_set_row_name problem row)
+
+constraintName' :: Constraint Glpk -> Glpk String
+constraintName' constraint = do
+  problem <- askProblem
+  row <- readRow constraint
+  liftIO $ glp_get_row_name problem row >>= peekCString
 
 deleteConstraint' :: Constraint Glpk -> Glpk ()
 deleteConstraint' constraintId = do
