@@ -14,6 +14,18 @@ test_simple = testGroup "Simple MIP problems"
   [ testCase "Simple MIP (GLPK)" simpleMIPGlpk
   ]
 
+-- | We solve a simple MIP of the form
+--
+-- @
+-- min  x + y
+-- s.t. x >= 1.1
+--      y >= 1.1
+--      0 <= x <= 5
+--      0 <= y <= 5
+--      x integer
+-- @
+--
+-- The optimal solution to this MIP is x = 2, y = 1.1.
 simpleMIP :: (MonadIO m, IPMonad m Double) => m ()
 simpleMIP = do
   x <- addVariable `asKind` Integer `within` Interval 0 5
