@@ -15,10 +15,8 @@ import Data.Void
 import Foreign.C.String
 import Foreign.C.Types
 import Foreign.Marshal.Alloc
-import Foreign.Marshal.Array
 import Foreign.Ptr
 import Foreign.Storable
-import Text.Printf
 
 import Math.Programming
 import Math.Programming.Glpk.Header
