@@ -17,7 +17,7 @@ setGetVariableName :: (MonadIO m, LPMonad m a) => m ()
 setGetVariableName = do
   let name = "foo"
   x <- addVariable `named` name
-  vName <- variableName x
+  vName <- getVariableName x
   liftIO $ vName @?= name
 
 setGetConstraintName :: (MonadIO m, LPMonad m a) => m ()
@@ -25,7 +25,7 @@ setGetConstraintName = do
   let name = "foo"
   x <- addVariable
   c <- addConstraint (1 *: x .>= 0) `named` name
-  cName <- constraintName c
+  cName <- getConstraintName c
   liftIO $ cName @?= name
 
 setGetVariableNameGlpk :: IO ()
