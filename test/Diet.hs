@@ -94,7 +94,7 @@ basicDiet =
     
     -- Check the variable values
     forM_ amounts $ \(food, v) -> do
-      x <- evaluate v
+      x <- getValue v
 
       let correct = expected food
           msg = printf
@@ -105,7 +105,7 @@ basicDiet =
       liftIO $ assertBool msg (abs (x - correct) <= 1e-1)
 
     -- Check the objective value
-    objectiveValue <- evaluate objective
+    objectiveValue <- evalExpr objective
     let msg = printf
               "Objective should be about %.2f, but is %.3f"
               expectedCost

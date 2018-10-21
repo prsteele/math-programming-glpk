@@ -59,7 +59,7 @@ instance LPMonad Glpk Double where
   setSense = setSense'
   optimizeLP = optimizeLP'
   setVariableBounds = setVariableBounds'
-  evaluateVariable = evaluateVariable'
+  getValue = getValue'
   setTimeout = setTimeout'
   writeFormulation = writeFormulation'
 
@@ -201,7 +201,7 @@ deleteVariable' variable = do
   liftIO $ allocaGlpkArray [column] (glp_del_cols problem 1)
   unregister askVariablesRef (fromVariable variable)
 
-addConstraint' :: Inequality (Variable Glpk) Double -> Glpk (Constraint Glpk)
+addConstraint' :: Inequality Double (Variable Glpk) -> Glpk (Constraint Glpk)
 addConstraint' (Inequality expr ordering) =
   let
     (terms, constant) =
@@ -223,10 +223,10 @@ addConstraint' (Inequality expr ordering) =
     numVars = fromIntegral (length terms)
 
     variables :: [Variable Glpk]
-    variables = map fst terms
+    variables = map snd terms
 
     coefficients :: [CDouble]
-    coefficients = map (realToFrac . snd) terms
+    coefficients = map (realToFrac . fst) terms
   in do
     problem <- askProblem
     columns <- mapM readColumn variables
@@ -255,7 +255,7 @@ deleteConstraint' constraintId = do
   liftIO $ allocaGlpkArray [row] (glp_del_rows problem 1)
   unregister askConstraintsRef (fromConstraint constraintId)
 
-setObjective' :: LinearExpr (Variable Glpk) Double -> Glpk ()
+setObjective' :: LinearExpr Double (Variable Glpk) -> Glpk ()
 setObjective' expr =
   let
     LinearExpr terms constant = simplify expr
@@ -266,7 +266,7 @@ setObjective' expr =
     liftIO $ glp_set_obj_coef problem (GlpkInt 0) (realToFrac constant)
 
     -- Set the variable terms
-    forM_ terms $ \(variable, coef) -> do
+    forM_ terms $ \(coef, variable) -> do
       column <- readColumn variable
       liftIO $ glp_set_obj_coef problem column (realToFrac coef)
 
@@ -352,8 +352,8 @@ setVariableDomain' variable domain =
     column <- readColumn variable
     liftIO $ glp_set_col_kind problem column vType
 
-evaluateVariable' :: Variable Glpk -> Glpk Double
-evaluateVariable' variable = do
+getValue' :: Variable Glpk -> Glpk Double
+getValue' variable = do
   lastSolveRef <- asks _glpkLastSolveType
   lastSolve <- liftIO $ readIORef lastSolveRef
   let method = case lastSolve of

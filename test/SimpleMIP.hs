@@ -28,11 +28,11 @@ simpleMIP = do
   -- Check that we reached optimality
   liftIO $ status @?= Optimal
 
-  vx <- evaluate x
+  vx <- getValue x
   let xmsg = printf "Expected x to be 2, but is %.3f" vx
   liftIO $ assertBool xmsg (abs (vx - 2) <= 1e-1)
 
-  vy <- evaluate y
+  vy <- getValue y
   let ymsg = printf "Expected y to be 1.1, but is %.3f" vy
   liftIO $ assertBool ymsg (abs (vy - 1.1) <= 1e-1)
 

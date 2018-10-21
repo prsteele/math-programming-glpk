@@ -30,9 +30,9 @@ simple = do
   setSense Minimization
   _ <- optimizeIP
 
-  xVal <- evaluateVariable x
-  yVal <- evaluate y
-  obj <- evaluate objective
+  xVal <- getValue x
+  yVal <- getValue y
+  obj <- evalExpr objective
   return (xVal, yVal, obj)
 
 main :: IO ()

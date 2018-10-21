@@ -1,6 +1,5 @@
-# MathProgHs
+# math-programming-glpk: A GLPK backend to the math-programming library
 
-A math programming library.
-
-This library is designed to formulate and solve math programs, in
-particular linear programs and mixed-integer linear programs.
+This package provides an interface to the
+[GLPK](https://www.gnu.org/software/glpk/) LP and MIP solver for the
+[`math-programming`](https://github.com/prsteele/math-programming) package.
