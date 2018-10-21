@@ -22,7 +22,7 @@ simple = do
   deleteVariable z
   deleteConstraint c1
 
-  nameConstraint c2 "con2"
+  setConstraintName c2 "con2"
 
   let objective = 1 *: x .+. 1 *: y
 
