@@ -10,14 +10,13 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Data.IORef
 import Data.List
+import Data.Typeable
 import Data.Void
 import Foreign.C.String
 import Foreign.C.Types
 import Foreign.Marshal.Alloc
-import Foreign.Marshal.Array
 import Foreign.Ptr
 import Foreign.Storable
-import Text.Printf
 
 import Math.Programming
 import Math.Programming.Glpk.Header
@@ -50,23 +49,29 @@ instance LPMonad Glpk Double where
       )
 
   addVariable = addVariable'
-  nameVariable = nameVariable'
+  getVariableName = getVariableName'
+  setVariableName = setVariableName'
   deleteVariable = deleteVariable'
   addConstraint = addConstraint'
-  nameConstraint = nameConstraint'
+  getConstraintName = getConstraintName'
+  setConstraintName = setConstraintName'
   deleteConstraint = deleteConstraint'
   setObjective = setObjective'
   setSense = setSense'
   optimizeLP = optimizeLP'
   setVariableBounds = setVariableBounds'
+  getVariableBounds = getVariableBounds'
   getValue = getValue'
+  getTimeout = getTimeout'
   setTimeout = setTimeout'
   writeFormulation = writeFormulation'
 
 instance IPMonad Glpk Double where
   optimizeIP = optimizeIP'
   setVariableDomain = setVariableDomain'
+  getVariableDomain = getVariableDomain'
   setRelativeMIPGap = setRelativeMIPGap'
+  getRelativeMIPGap = getRelativeMIPGap'
 
 runGlpk :: Glpk a -> IO (Either GlpkError a)
 runGlpk glpk = do
@@ -168,6 +173,7 @@ unregister askRef x =
 
 data GlpkError
   = UnknownVariable GlpkVariable
+  | UnknownCode String CInt
   deriving
     ( Show
     )
@@ -188,11 +194,17 @@ addVariable' = do
   register askVariablesRef variable
   return (Variable variable)
 
-nameVariable' :: Variable Glpk -> String -> Glpk ()
-nameVariable' variable name = do
+setVariableName' :: Variable Glpk -> String -> Glpk ()
+setVariableName' variable name = do
     problem <- askProblem
     column <- readColumn variable
     liftIO $ withCString name (glp_set_col_name problem column)
+
+getVariableName' :: Variable Glpk -> Glpk String
+getVariableName' variable = do
+  problem <- askProblem
+  column <- readColumn variable
+  liftIO $ glp_get_col_name problem column >>= peekCString
 
 deleteVariable' :: Variable Glpk -> Glpk ()
 deleteVariable' variable = do
@@ -204,11 +216,7 @@ deleteVariable' variable = do
 addConstraint' :: Inequality Double (Variable Glpk) -> Glpk (Constraint Glpk)
 addConstraint' (Inequality expr ordering) =
   let
-    (terms, constant) =
-      let
-        LinearExpr terms constant = simplify expr
-      in
-        (terms, constant)
+    LinearExpr terms constant = simplify expr
 
     constraintType :: GlpkConstraintType
     constraintType = case ordering of
@@ -242,11 +250,17 @@ addConstraint' (Inequality expr ordering) =
     register askConstraintsRef constraintId
     return (Constraint constraintId)
 
-nameConstraint' :: Constraint Glpk -> String -> Glpk ()
-nameConstraint' constraintId name = do
+setConstraintName' :: Constraint Glpk -> String -> Glpk ()
+setConstraintName' constraintId name = do
   problem <- askProblem
   row <- readRow constraintId
   liftIO $ withCString name (glp_set_row_name problem row)
+
+getConstraintName' :: Constraint Glpk -> Glpk String
+getConstraintName' constraint = do
+  problem <- askProblem
+  row <- readRow constraint
+  liftIO $ glp_get_row_name problem row >>= peekCString
 
 deleteConstraint' :: Constraint Glpk -> Glpk ()
 deleteConstraint' constraintId = do
@@ -340,6 +354,23 @@ setVariableBounds' variable bounds =
     column <- readColumn variable
     liftIO $ glp_set_col_bnds problem column boundType cLow cHigh
 
+getVariableBounds' :: Variable Glpk -> Glpk (Bounds Double)
+getVariableBounds' variable =
+  let
+    boundsFor lb ub | lb == -maxCDouble && ub == maxCDouble = Free
+                    | lb == -maxCDouble && ub == 0.0        = NonPositiveReals
+                    | lb == 0.0         && ub == maxCDouble = NonNegativeReals
+                    | otherwise                             = Interval lb' ub'
+      where
+        lb' = realToFrac lb
+        ub' = realToFrac ub
+  in do
+    problem <- askProblem
+    column <- readColumn variable
+    lb <- liftIO (glp_get_col_lb problem column)
+    ub <- liftIO (glp_get_col_ub problem column)
+    return (boundsFor lb ub)
+
 setVariableDomain' :: Variable Glpk -> Domain -> Glpk ()
 setVariableDomain' variable domain =
   let
@@ -351,6 +382,23 @@ setVariableDomain' variable domain =
     problem <- askProblem
     column <- readColumn variable
     liftIO $ glp_set_col_kind problem column vType
+
+getVariableDomain' :: Variable Glpk -> Glpk Domain
+getVariableDomain' variable =
+  let
+    getDomain :: GlpkVariableType -> Glpk Domain
+    getDomain vType | vType == glpkContinuous = return Continuous
+    getDomain vType | vType == glpkInteger    = return Integer
+    getDomain vType | vType == glpkBinary     = return Binary
+                    | otherwise               = throwError unknownCode
+      where
+        typeName = show (typeOf vType)
+        GlpkVariableType code = vType
+        unknownCode = UnknownCode typeName code
+  in do
+    problem <- askProblem
+    column <- readColumn variable
+    getDomain =<< liftIO (glp_get_col_kind problem column)
 
 getValue' :: Variable Glpk -> Glpk Double
 getValue' variable = do
@@ -365,6 +413,16 @@ getValue' variable = do
   problem <- askProblem
   column <- readColumn variable
   liftIO $ realToFrac <$> method problem column
+
+getTimeout' :: Glpk Double
+getTimeout' =
+  let
+    fromMillis :: CInt -> Double
+    fromMillis millis = realToFrac millis / 1000
+  in do
+    controlRef <- asks _glpkSimplexControl
+    control <- liftIO (readIORef controlRef)
+    return $ fromMillis (smcpTimeLimitMillis control)
 
 setTimeout' :: Double -> Glpk ()
 setTimeout' seconds =
@@ -384,6 +442,12 @@ setRelativeMIPGap' gap = do
   let control' = control { iocpRelativeMIPGap = realToFrac gap }
   liftIO (writeIORef controlRef control')
 
+getRelativeMIPGap' :: Glpk Double
+getRelativeMIPGap' = do
+  controlRef <- asks _glpkMIPControl
+  control <- liftIO (readIORef controlRef)
+  return $ realToFrac (iocpRelativeMIPGap control)
+
 solutionStatus :: GlpkSolutionStatus -> SolutionStatus
 solutionStatus status
   | status == glpkOptimal    = Optimal
@@ -398,3 +462,12 @@ writeFormulation' fileName = do
   problem <- askProblem
   _ <- liftIO $ withCString fileName (glp_write_lp problem nullPtr)
   return ()
+
+maxCDouble :: CDouble
+maxCDouble = encodeFloat significand' exponent'
+  where
+    base = floatRadix (undefined :: CDouble)
+    precision = floatDigits (undefined :: CDouble)
+    (_, maxExponent) = floatRange (undefined :: CDouble)
+    significand' = base ^ precision - 1
+    exponent' = maxExponent - precision
