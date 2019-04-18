@@ -1,5 +1,5 @@
 name:                math-programming-glpk
-version:             0.1.0.0
+version:             0.1.2
 github:              "prsteele/math-programming-glpk"
 license:             BSD3
 author:              "Patrick Steele"
@@ -21,10 +21,10 @@ description:         Please see the README on GitHub at <https://github.com/prst
 
 dependencies:
   - base >= 4.7 && < 5
-  - glpk-hs >= 0.1.0.0 && < 0.2
+  - glpk-hs >= 0.2.0 && < 0.3
   - mtl >= 2.2.2 && < 2.3
   - containers >= 0.6.0.1 && < 0.7
-  - math-programming >= 0.1.0.0 && < 0.2
+  - math-programming >= 0.2.0 && < 0.3
 
 library:
   ghc-options:
