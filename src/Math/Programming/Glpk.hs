@@ -1,25 +1,24 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE TypeFamilies               #-}
 module Math.Programming.Glpk where
 
-import Control.Monad
-import Control.Monad.IO.Class
-import Control.Monad.Except
-import Control.Monad.Reader
-import Data.IORef
-import Data.List
-import Data.Typeable
-import Data.Void
-import Foreign.C.String
-import Foreign.C.Types
-import Foreign.Marshal.Alloc
-import Foreign.Ptr
-import Foreign.Storable
+import           Control.Monad
+import           Control.Monad.Except
+import           Control.Monad.Reader
+import           Data.IORef
+import           Data.List
+import           Data.Typeable
+import           Data.Void
+import           Foreign.C.String
+import           Foreign.C.Types
+import           Foreign.Marshal.Alloc
+import           Foreign.Ptr
+import           Foreign.Storable
 
-import Math.Programming
-import Math.Programming.Glpk.Header
+import           Math.Programming
+import           Math.Programming.Glpk.Header
 
 newtype Glpk a = Glpk { _runGlpk :: ExceptT GlpkError (ReaderT GlpkEnv IO) a }
   deriving
@@ -31,7 +30,9 @@ newtype Glpk a = Glpk { _runGlpk :: ExceptT GlpkError (ReaderT GlpkEnv IO) a }
     , MonadError GlpkError
     )
 
-instance LPMonad Glpk Double where
+instance LPMonad Glpk where
+  type Numeric Glpk = Double
+
   data Variable Glpk
     = Variable { fromVariable :: GlpkVariable }
     deriving
@@ -66,7 +67,7 @@ instance LPMonad Glpk Double where
   setTimeout = setTimeout'
   writeFormulation = writeFormulation'
 
-instance IPMonad Glpk Double where
+instance IPMonad Glpk where
   optimizeIP = optimizeIP'
   setVariableDomain = setVariableDomain'
   getVariableDomain = getVariableDomain'
@@ -80,14 +81,23 @@ runGlpk glpk = do
   problem <- glp_create_prob
 
   -- Load the default simplex control parameters
-  simplexControl <- alloca $ \simplexControlPtr -> do
+  defaultSimplexControl <- alloca $ \simplexControlPtr -> do
     glp_init_smcp simplexControlPtr
     peek simplexControlPtr
 
   -- Load the default MIP control parameters
-  mipControl <- alloca $ \mipControlPtr -> do
+  defaultMipControl <- alloca $ \mipControlPtr -> do
     glp_init_iocp mipControlPtr
     peek mipControlPtr
+
+  -- Turn on presolve, because it seems insane not to.
+  --
+  -- In particular, this ensures that a naked call to optimizeIP
+  -- doesn't fail because of the lack of a basis. Sophisticated users
+  -- can control this parameter as they see fit befor the first
+  -- optimization call.
+  let simplexControl = defaultSimplexControl { smcpPresolve = glpkPresolveOn }
+      mipControl = defaultMipControl { iocpPresolve = glpkPresolveOn }
 
   env <- GlpkEnv problem
          <$> newIORef []
@@ -104,25 +114,25 @@ data SolveType = LP | MIP | InteriorPoint
 
 data GlpkEnv
   = GlpkEnv
-  { _glpkEnvProblem :: Ptr Problem
+  { _glpkEnvProblem     :: Ptr Problem
   -- ^ A pointer to the Problem object. Most GLPK routines take this
   -- as the first argument.
-  , _glpkVariables :: IORef [GlpkVariable]
+  , _glpkVariables      :: IORef [GlpkVariable]
   -- ^ The variables in the model
-  , _glpkConstraints :: IORef [GlpkConstraint]
+  , _glpkConstraints    :: IORef [GlpkConstraint]
   -- ^ The constraints in the model
   , _glpkSimplexControl :: IORef SimplexMethodControlParameters
   -- ^ The control parameters for the simplex method
-  , _glpkMIPControl :: IORef (MIPControlParameters Void)
+  , _glpkMIPControl     :: IORef (MIPControlParameters Void)
   -- ^ The control parameters for the MIP solver
-  , _glpkLastSolveType :: IORef (Maybe SolveType)
+  , _glpkLastSolveType  :: IORef (Maybe SolveType)
   -- ^ The type of the last solve. This is needed to know whether to
   -- retrieve simplex, interior point, or MIP solutions.
   }
 
 data NamedRef a
   = NamedRef
-    { namedRefId :: Int
+    { namedRefId  :: Int
     , namedRefRef :: IORef a
     }
 
@@ -213,10 +223,10 @@ deleteVariable' variable = do
   liftIO $ allocaGlpkArray [column] (glp_del_cols problem 1)
   unregister askVariablesRef (fromVariable variable)
 
-addConstraint' :: Inequality Double (Variable Glpk) -> Glpk (Constraint Glpk)
-addConstraint' (Inequality expr ordering) =
+addConstraint' :: Inequality (LinearExpr Double (Variable Glpk)) -> Glpk (Constraint Glpk)
+addConstraint' (Inequality ordering lhs rhs) =
   let
-    LinearExpr terms constant = simplify expr
+    LinearExpr terms constant = (simplify (lhs .-. rhs)) :: LinearExpr Double (Variable Glpk)
 
     constraintType :: GlpkConstraintType
     constraintType = case ordering of
@@ -224,8 +234,8 @@ addConstraint' (Inequality expr ordering) =
       GT -> glpkGT
       EQ -> glpkBounded
 
-    rhs :: CDouble
-    rhs = realToFrac (negate constant)
+    constraintRhs :: CDouble
+    constraintRhs = realToFrac (negate constant)
 
     numVars :: CInt
     numVars = fromIntegral (length terms)
@@ -243,7 +253,7 @@ addConstraint' (Inequality expr ordering) =
       rowRef <- newIORef row
       allocaGlpkArray columns $ \columnArr ->
         allocaGlpkArray coefficients $ \coefficientArr -> do
-          glp_set_row_bnds problem row constraintType rhs rhs
+          glp_set_row_bnds problem row constraintType constraintRhs constraintRhs
           glp_set_mat_row problem row numVars columnArr coefficientArr
       return $ NamedRef (fromIntegral row) rowRef
 
@@ -345,9 +355,9 @@ setVariableBounds' :: Variable Glpk -> Bounds Double -> Glpk ()
 setVariableBounds' variable bounds =
   let
     (boundType, cLow, cHigh) = case bounds of
-      Free -> (glpkFree, 0, 0)
-      NonNegativeReals -> (glpkGT, 0, 0)
-      NonPositiveReals -> (glpkLT, 0, 0)
+      Free              -> (glpkFree, 0, 0)
+      NonNegativeReals  -> (glpkGT, 0, 0)
+      NonPositiveReals  -> (glpkLT, 0, 0)
       Interval low high -> (glpkBounded, realToFrac low, realToFrac high)
   in do
     problem <- askProblem
@@ -376,8 +386,8 @@ setVariableDomain' variable domain =
   let
     vType = case domain of
       Continuous -> glpkContinuous
-      Integer -> glpkInteger
-      Binary -> glpkBinary
+      Integer    -> glpkInteger
+      Binary     -> glpkBinary
   in do
     problem <- askProblem
     column <- readColumn variable
@@ -405,26 +415,26 @@ getValue' variable = do
   lastSolveRef <- asks _glpkLastSolveType
   lastSolve <- liftIO $ readIORef lastSolveRef
   let method = case lastSolve of
-        Nothing -> glp_get_col_prim
-        Just LP -> glp_get_col_prim
-        Just MIP -> glp_mip_col_val
+        Nothing            -> glp_get_col_prim
+        Just LP            -> glp_get_col_prim
+        Just MIP           -> glp_mip_col_val
         Just InteriorPoint -> glp_ipt_col_prim
 
   problem <- askProblem
   column <- readColumn variable
   liftIO $ realToFrac <$> method problem column
 
-getTimeout' :: Glpk Double
+getTimeout' :: RealFrac a => Glpk a
 getTimeout' =
   let
-    fromMillis :: CInt -> Double
+    fromMillis :: RealFrac a => CInt -> a
     fromMillis millis = realToFrac millis / 1000
   in do
     controlRef <- asks _glpkSimplexControl
     control <- liftIO (readIORef controlRef)
     return $ fromMillis (smcpTimeLimitMillis control)
 
-setTimeout' :: Double -> Glpk ()
+setTimeout' :: RealFrac a => a -> Glpk ()
 setTimeout' seconds =
   let
     millis :: Integer
@@ -435,14 +445,14 @@ setTimeout' seconds =
     let control' = control { smcpTimeLimitMillis = fromIntegral millis }
     liftIO (writeIORef controlRef control')
 
-setRelativeMIPGap' :: Double -> Glpk ()
+setRelativeMIPGap' :: RealFrac a => a -> Glpk ()
 setRelativeMIPGap' gap = do
   controlRef <- asks _glpkMIPControl
   control <- liftIO (readIORef controlRef)
   let control' = control { iocpRelativeMIPGap = realToFrac gap }
   liftIO (writeIORef controlRef control')
 
-getRelativeMIPGap' :: Glpk Double
+getRelativeMIPGap' :: RealFrac a => Glpk a
 getRelativeMIPGap' = do
   controlRef <- asks _glpkMIPControl
   control <- liftIO (readIORef controlRef)
