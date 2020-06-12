@@ -7,6 +7,7 @@ exposed in 'Math.Programming.Glpk'.
 {-# LANGUAGE TypeFamilies               #-}
 module Math.Programming.Glpk.Internal where
 
+import           Control.Exception
 import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.Reader
@@ -80,39 +81,38 @@ instance IPMonad Glpk where
 
 runGlpk :: Glpk a -> IO (Either GlpkError a)
 runGlpk glpk = do
+  -- Turn off terminal output. If we don't, users won't be able to
+  -- inhibit terminal output generated from our setup.
   _ <- glp_term_out glpkOff
 
-  problem <- glp_create_prob
+  bracket glp_create_prob glp_delete_prob $ \problem -> do
+    -- Load the default simplex control parameters
+    defaultSimplexControl <- alloca $ \simplexControlPtr -> do
+      glp_init_smcp simplexControlPtr
+      peek simplexControlPtr
 
-  -- Load the default simplex control parameters
-  defaultSimplexControl <- alloca $ \simplexControlPtr -> do
-    glp_init_smcp simplexControlPtr
-    peek simplexControlPtr
+    -- Load the default MIP control parameters
+    defaultMipControl <- alloca $ \mipControlPtr -> do
+      glp_init_iocp mipControlPtr
+      peek mipControlPtr
 
-  -- Load the default MIP control parameters
-  defaultMipControl <- alloca $ \mipControlPtr -> do
-    glp_init_iocp mipControlPtr
-    peek mipControlPtr
+    -- Turn on presolve, because it seems insane not to.
+    --
+    -- In particular, this ensures that a naked call to optimizeIP
+    -- doesn't fail because of the lack of a basis. Sophisticated users
+    -- can control this parameter as they see fit befor the first
+    -- optimization call.
+    let simplexControl = defaultSimplexControl { smcpPresolve = glpkPresolveOn }
+        mipControl = defaultMipControl { iocpPresolve = glpkPresolveOn }
 
-  -- Turn on presolve, because it seems insane not to.
-  --
-  -- In particular, this ensures that a naked call to optimizeIP
-  -- doesn't fail because of the lack of a basis. Sophisticated users
-  -- can control this parameter as they see fit befor the first
-  -- optimization call.
-  let simplexControl = defaultSimplexControl { smcpPresolve = glpkPresolveOn }
-      mipControl = defaultMipControl { iocpPresolve = glpkPresolveOn }
+    env <- GlpkEnv problem
+           <$> newIORef []
+           <*> newIORef []
+           <*> newIORef simplexControl
+           <*> newIORef mipControl
+           <*> newIORef Nothing
 
-  env <- GlpkEnv problem
-         <$> newIORef []
-         <*> newIORef []
-         <*> newIORef simplexControl
-         <*> newIORef mipControl
-         <*> newIORef Nothing
-  result <- runReaderT (runExceptT (_runGlpk glpk)) env
-
-  glp_delete_prob problem
-  return result
+    runReaderT (runExceptT (_runGlpk glpk)) env
 
 data SolveType = LP | MIP | InteriorPoint
 
