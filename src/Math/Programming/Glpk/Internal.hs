@@ -2,9 +2,11 @@
 exposed in 'Math.Programming.Glpk'.
 -}
 {-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeSynonymInstances       #-}
 module Math.Programming.Glpk.Internal where
 
 import           Control.Exception
@@ -54,30 +56,37 @@ instance LPMonad Glpk where
       , Show
       )
 
+  data Objective Glpk = Objective
+
   addVariable = addVariable'
+  removeVariable = removeVariable'
   getVariableName = getVariableName'
   setVariableName = setVariableName'
-  deleteVariable = deleteVariable'
+  getVariableBounds = getVariableBounds'
+  setVariableBounds = setVariableBounds'
+  getVariableValue = getVariableValue'
   addConstraint = addConstraint'
+  removeConstraint = removeConstraint'
   getConstraintName = getConstraintName'
   setConstraintName = setConstraintName'
-  deleteConstraint = deleteConstraint'
-  setObjective = setObjective'
-  setSense = setSense'
-  optimizeLP = optimizeLP'
-  setVariableBounds = setVariableBounds'
-  getVariableBounds = getVariableBounds'
-  getValue = getValue'
+  getDualValue = getDualValue'
+  addObjective = addObjective'
+  getObjectiveName = getObjectiveName'
+  setObjectiveName = setObjectiveName'
+  getObjectiveSense = getObjectiveSense'
+  setObjectiveSense = setObjectiveSense'
+  getObjectiveValue = getObjectiveValue'
   getTimeout = getTimeout'
   setTimeout = setTimeout'
+  optimizeLP = optimizeLP'
   writeFormulation = writeFormulation'
 
 instance IPMonad Glpk where
   optimizeIP = optimizeIP'
-  setVariableDomain = setVariableDomain'
   getVariableDomain = getVariableDomain'
-  setRelativeMIPGap = setRelativeMIPGap'
+  setVariableDomain = setVariableDomain'
   getRelativeMIPGap = getRelativeMIPGap'
+  setRelativeMIPGap = setRelativeMIPGap'
 
 runGlpk :: Glpk a -> IO (Either GlpkError a)
 runGlpk glpk = do
@@ -113,6 +122,7 @@ runGlpk glpk = do
            <*> newIORef Nothing
 
     runReaderT (runExceptT (_runGlpk glpk)) env
+
 
 data SolveType = LP | MIP | InteriorPoint
 
@@ -225,17 +235,17 @@ getVariableName' variable = do
   column <- readColumn variable
   liftIO $ glp_get_col_name problem column >>= peekCString
 
-deleteVariable' :: Variable Glpk -> Glpk ()
-deleteVariable' variable = do
+removeVariable' :: Variable Glpk -> Glpk ()
+removeVariable' variable = do
   problem <- askProblem
   column <- readColumn variable
   liftIO $ allocaGlpkArray [column] (glp_del_cols problem 1)
   unregister askVariablesRef (fromVariable variable)
 
-addConstraint' :: Inequality (LinearExpr Double (Variable Glpk)) -> Glpk (Constraint Glpk)
+addConstraint' :: Inequality (LinearExpression Double (Variable Glpk)) -> Glpk (Constraint Glpk)
 addConstraint' (Inequality ordering lhs rhs) =
   let
-    LinearExpr terms constant = (simplify (lhs .-. rhs)) :: LinearExpr Double (Variable Glpk)
+    LinearExpression terms constant = (simplify (lhs .-. rhs)) :: LinearExpression Double (Variable Glpk)
 
     constraintType :: GlpkConstraintType
     constraintType = case ordering of
@@ -281,17 +291,23 @@ getConstraintName' constraint = do
   row <- readRow constraint
   liftIO $ glp_get_row_name problem row >>= peekCString
 
-deleteConstraint' :: Constraint Glpk -> Glpk ()
-deleteConstraint' constraintId = do
+getDualValue' :: Constraint Glpk -> Glpk Double
+getDualValue' constraint = do
+  problem <- askProblem
+  row <- readRow constraint
+  fmap realToFrac . liftIO $ glp_get_row_dual problem row
+
+removeConstraint' :: Constraint Glpk -> Glpk ()
+removeConstraint' constraintId = do
   problem <- askProblem
   row <- readRow constraintId
   liftIO $ allocaGlpkArray [row] (glp_del_rows problem 1)
   unregister askConstraintsRef (fromConstraint constraintId)
 
-setObjective' :: LinearExpr Double (Variable Glpk) -> Glpk ()
-setObjective' expr =
+addObjective' :: LinearExpression Double (Variable Glpk) -> Glpk (Objective Glpk)
+addObjective' expr =
   let
-    LinearExpr terms constant = simplify expr
+    LinearExpression terms constant = simplify expr
   in do
     problem <- askProblem
 
@@ -303,8 +319,28 @@ setObjective' expr =
       column <- readColumn variable
       liftIO $ glp_set_obj_coef problem column (realToFrac coef)
 
-setSense' :: Sense -> Glpk ()
-setSense' sense =
+    pure Objective
+
+getObjectiveName' :: Objective Glpk -> Glpk String
+getObjectiveName' _ = do
+  problem <- askProblem
+  liftIO $ glp_get_obj_name problem >>= peekCString
+
+setObjectiveName' :: Objective Glpk -> String -> Glpk ()
+setObjectiveName' _ name = do
+  problem <- askProblem
+  liftIO $ withCString name (glp_set_obj_name problem)
+
+getObjectiveSense' :: Objective Glpk -> Glpk Sense
+getObjectiveSense' _ = do
+  problem <- askProblem
+  direction <- liftIO $ glp_get_obj_dir problem
+  if direction == glpkMin
+    then pure Minimization
+    else pure Maximization
+
+setObjectiveSense' :: Objective Glpk -> Sense -> Glpk ()
+setObjectiveSense' _ sense =
   let
     direction = case sense of
       Minimization -> glpkMin
@@ -312,6 +348,17 @@ setSense' sense =
   in do
     problem <- askProblem
     liftIO $ glp_set_obj_dir problem direction
+
+getObjectiveValue' :: Objective Glpk -> Glpk Double
+getObjectiveValue' _ = do
+  problem <- askProblem
+  lastSolveRef <- asks _glpkLastSolveType
+  lastSolve <- (liftIO . readIORef) lastSolveRef
+  fmap realToFrac . liftIO $ case lastSolve of
+    Just MIP           -> glp_mip_obj_val problem
+    Just LP            -> glp_get_obj_val problem
+    Just InteriorPoint -> glp_ipt_obj_val problem
+    Nothing            -> glp_get_obj_val problem -- There's been no solve, so who cares
 
 optimizeLP' :: Glpk SolutionStatus
 optimizeLP' =
@@ -419,8 +466,8 @@ getVariableDomain' variable =
     column <- readColumn variable
     getDomain =<< liftIO (glp_get_col_kind problem column)
 
-getValue' :: Variable Glpk -> Glpk Double
-getValue' variable = do
+getVariableValue' :: Variable Glpk -> Glpk Double
+getVariableValue' variable = do
   lastSolveRef <- asks _glpkLastSolveType
   lastSolve <- (liftIO . readIORef) lastSolveRef
 
