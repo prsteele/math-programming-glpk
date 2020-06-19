@@ -1,5 +1,5 @@
 name:                math-programming-glpk
-version:             0.1.0.0
+version:             0.3.0
 github:              "prsteele/math-programming-glpk"
 license:             BSD3
 author:              "Patrick Steele"
@@ -21,26 +21,16 @@ description:         Please see the README on GitHub at <https://github.com/prst
 
 dependencies:
   - base >= 4.7 && < 5
-  - glpk-hs >= 0.1.0.0 && < 0.2
-  - mtl >= 2.2.2 && < 2.3
-  - containers >= 0.5.11 && < 0.6
-  - math-programming
+  - glpk-headers >= 0.4.0 && < 0.5
+  - mtl
+  - containers
+  - math-programming >= 0.3.0 && < 0.4
+  - text
 
 library:
   ghc-options:
     - -Wall
   source-dirs: src
-
-executables:
-  main-exe:
-    main:                Main.hs
-    source-dirs:         app
-    ghc-options:
-      - -Wall
-    extra-libraries:
-      - glpk
-    dependencies:
-      - math-programming-glpk
 
 tests:
   math-programming-glpk-test:
@@ -52,7 +42,7 @@ tests:
       - glpk
     dependencies:
       - math-programming-glpk
-      - math-programming-tests
-      - tasty >= 1.1.0.2 && < 1.2
-      - tasty-discover >= 4.2.0 && < 4.3
-      - tasty-hunit >= 0.10.0.1 && < 0.11
+      - math-programming-tests >= 0.3.0 && < 0.4
+      - tasty
+      - tasty-discover
+      - tasty-hunit
