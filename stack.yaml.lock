@@ -11,6 +11,27 @@ packages:
       sha256: 6d598d44e8c13087a5fb334632d3e20a5a9e0026cd9ecdfba978c66c484ddbb5
   original:
     hackage: derive-storable-0.1.2.0
+- completed:
+    hackage: glpk-headers-0.4.0@sha256:49f35aa4f9df18b28efcd8ea408a8b6a40dd398d60f90c6ee4ba21e597e693d7,1573
+    pantry-tree:
+      size: 440
+      sha256: 7368915762bf33648569dd05900525663cc2a871c7b0c6561ffe1163f8c4a9d9
+  original:
+    hackage: glpk-headers-0.4.0
+- completed:
+    hackage: math-programming-0.3.0@sha256:c701b5cc91df6f3de7502b1eef81d85aaef1fb1cd31904ddcc39231e3ef67971,1833
+    pantry-tree:
+      size: 602
+      sha256: e4c0c38540df5ae0d7e240cc5bfd543ab2674da112ac99ccdcff8f200d558abf
+  original:
+    hackage: math-programming-0.3.0
+- completed:
+    hackage: math-programming-tests-0.3.0@sha256:681a904b00587046e9f6cd0383f7336381a71154ea190fc4064783cd9ef88c26,1388
+    pantry-tree:
+      size: 554
+      sha256: 353cf0c9b08be3bb30d90a80fa98f0c3cb7e1ae7afe000b23eb402b0b38fe5d9
+  original:
+    hackage: math-programming-tests-0.3.0
 snapshots:
 - completed:
     size: 524996
