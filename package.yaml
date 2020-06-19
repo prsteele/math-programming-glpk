@@ -21,10 +21,10 @@ description:         Please see the README on GitHub at <https://github.com/prst
 
 dependencies:
   - base >= 4.7 && < 5
-  - glpk-hs
+  - glpk-headers >= 0.4.0 && < 0.5
   - mtl
   - containers
-  - math-programming
+  - math-programming >= 0.3.0 && < 0.4
   - text
 
 library:
@@ -42,7 +42,7 @@ tests:
       - glpk
     dependencies:
       - math-programming-glpk
-      - math-programming-tests
+      - math-programming-tests >= 0.3.0 && < 0.4
       - tasty
       - tasty-discover
       - tasty-hunit
