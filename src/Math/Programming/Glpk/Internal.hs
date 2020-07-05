@@ -218,6 +218,9 @@ addVariable' = do
   problem <- askProblem
   variable <- liftIO $ do
     column <- glp_add_cols problem 1
+
+    glp_set_col_bnds problem column glpkFree 0 0
+
     columnRef <- newIORef column
     return $ NamedRef (fromIntegral column) columnRef
   register askVariablesRef variable
@@ -251,7 +254,7 @@ addConstraint' (Inequality ordering lhs rhs) =
     constraintType = case ordering of
       LT -> glpkLT
       GT -> glpkGT
-      EQ -> glpkBounded
+      EQ -> glpkFixed
 
     constraintRhs :: CDouble
     constraintRhs = realToFrac (negate constant)
