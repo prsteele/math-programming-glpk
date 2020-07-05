@@ -79,7 +79,6 @@ instance LPMonad Glpk where
   getTimeout = getTimeout'
   setTimeout = setTimeout'
   optimizeLP = optimizeLP'
-  writeFormulation = writeFormulation'
 
 instance IPMonad Glpk where
   optimizeIP = optimizeIP'
@@ -527,8 +526,9 @@ solutionStatus status
   | status == glpkUnbounded  = Unbounded
   | otherwise                = Error
 
-writeFormulation' :: FilePath -> Glpk ()
-writeFormulation' fileName = do
+-- | Write out the current formulation to a file.
+writeFormulation :: FilePath -> Glpk ()
+writeFormulation fileName = do
   problem <- askProblem
   _ <- liftIO $ withCString fileName (glp_write_lp problem nullPtr)
   return ()

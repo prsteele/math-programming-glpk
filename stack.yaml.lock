@@ -19,19 +19,19 @@ packages:
   original:
     hackage: glpk-headers-0.4.0
 - completed:
-    hackage: math-programming-0.3.0@sha256:c701b5cc91df6f3de7502b1eef81d85aaef1fb1cd31904ddcc39231e3ef67971,1833
+    hackage: math-programming-0.4.0@sha256:bf6476d211029e3682b9b1a131dc96957efae0d45aa59921fe0e79023306d60b,1838
     pantry-tree:
-      size: 602
-      sha256: e4c0c38540df5ae0d7e240cc5bfd543ab2674da112ac99ccdcff8f200d558abf
+      size: 603
+      sha256: a891b00ad5d701cd803a7b9bffe3a72758a5da6a6de91132084271a22d1bf080
   original:
-    hackage: math-programming-0.3.0
+    hackage: math-programming-0.4.0
 - completed:
-    hackage: math-programming-tests-0.3.0@sha256:681a904b00587046e9f6cd0383f7336381a71154ea190fc4064783cd9ef88c26,1388
+    hackage: math-programming-tests-0.4.0@sha256:9d280c203af5f3a33f8f6059affec41e3619d170f095465a714267d8149d147a,1388
     pantry-tree:
-      size: 554
-      sha256: 353cf0c9b08be3bb30d90a80fa98f0c3cb7e1ae7afe000b23eb402b0b38fe5d9
+      size: 555
+      sha256: bd0302c246bb318009dea5117ad238651ecdddb66958728da2e41bf73f6aa6ba
   original:
-    hackage: math-programming-tests-0.3.0
+    hackage: math-programming-tests-0.4.0
 snapshots:
 - completed:
     size: 524996
