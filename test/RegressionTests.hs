@@ -1,7 +1,6 @@
 module RegressionTests where
 
 import           Control.Monad.IO.Class
-
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
@@ -12,6 +11,8 @@ test_tree :: TestTree
 test_tree = testGroup "Regression tests"
             [ testCase "Free variables (LP)" testFreeVariablesLP
             , testCase "Free variables (IP)" testFreeVariablesIP
+            , testCase "Infeasible (LP)" testInfeasibleLP
+            , testCase "Infeasible (IP)" testInfeasibleIP
             ]
 
 assertFeasible :: SolutionStatus -> Glpk ()
@@ -22,14 +23,14 @@ assertFeasible result
       Infeasible -> assertFailure "Infeasible program"
       _          -> pure ()
 
-assertRunGlpk :: Glpk a -> IO ()
+assertRunGlpk :: Glpk a -> Assertion
 assertRunGlpk program = do
   eResult <- runGlpk program
   case eResult of
     Left err -> assertFailure ("Error solving program: " <> show err)
     Right _  -> pure ()
 
-testFreeVariablesLP :: IO ()
+testFreeVariablesLP :: Assertion
 testFreeVariablesLP = assertRunGlpk $ do
   x <- free
   y <- free
@@ -49,7 +50,7 @@ testFreeVariablesLP = assertRunGlpk $ do
   liftIO $ 3.1 @=? vy
   liftIO $ -3.1 @=? vz
 
-testFreeVariablesIP :: IO ()
+testFreeVariablesIP :: Assertion
 testFreeVariablesIP = assertRunGlpk $ do
   x <- integer
   y <- integer
@@ -68,3 +69,23 @@ testFreeVariablesIP = assertRunGlpk $ do
   liftIO $ 0 @=? vx
   liftIO $ 3 @=? vy
   liftIO $ -3 @=? vz
+
+testInfeasibleLP :: Assertion
+testInfeasibleLP = assertRunGlpk $ do
+  x <- free
+  _ <- x @>=# 2
+  _ <- x @<=# 1
+
+  status <- optimizeLP
+
+  liftIO $ Infeasible @=? status
+
+testInfeasibleIP :: Assertion
+testInfeasibleIP = assertRunGlpk $ do
+  x <- integer
+  _ <- x @>=# 2
+  _ <- x @<=# 1
+
+  status <- optimizeIP
+
+  liftIO $ Infeasible @=? status

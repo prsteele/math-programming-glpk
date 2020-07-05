@@ -363,15 +363,7 @@ getObjectiveValue' _ = do
     Nothing            -> glp_get_obj_val problem -- There's been no solve, so who cares
 
 optimizeLP' :: Glpk SolutionStatus
-optimizeLP' =
-  let
-    convertResult :: Ptr Problem -> GlpkSimplexStatus -> IO SolutionStatus
-    convertResult problem result
-      | result == glpkSimplexSuccess =
-          glp_get_status problem >>= return . solutionStatus
-      | otherwise =
-          return Error
-  in do
+optimizeLP' = do
     -- Note that we've run an LP solve
     solveTypeRef <- asks _glpkLastSolveType
     liftIO $ writeIORef solveTypeRef (Just LP)
@@ -383,19 +375,11 @@ optimizeLP' =
       control <- readIORef controlRef
       alloca $ \controlPtr -> do
         poke controlPtr control
-        result <- glp_simplex problem controlPtr
-        convertResult problem result
+        _<- glp_simplex problem controlPtr
+        glp_get_status problem >>= pure . solutionStatus
 
 optimizeIP' :: Glpk SolutionStatus
-optimizeIP' =
-  let
-    convertResult :: Ptr Problem -> GlpkMIPStatus -> IO SolutionStatus
-    convertResult problem result
-      | result == glpkMIPSuccess =
-        glp_mip_status problem >>= return . solutionStatus
-      | otherwise =
-        return Error
-  in do
+optimizeIP' = do
     -- Note that we've run a MIP solve
     solveTypeRef <- asks _glpkLastSolveType
     liftIO $ writeIORef solveTypeRef (Just MIP)
@@ -406,8 +390,8 @@ optimizeIP' =
       control <- readIORef controlRef
       alloca $ \controlPtr -> do
         poke controlPtr control
-        result <- glp_intopt problem controlPtr
-        convertResult problem result
+        _ <- glp_intopt problem controlPtr
+        glp_mip_status problem >>= pure . solutionStatus
 
 setVariableBounds' :: Variable Glpk -> Bounds Double -> Glpk ()
 setVariableBounds' variable bounds =
@@ -524,6 +508,7 @@ solutionStatus status
   | status == glpkInfeasible = Infeasible
   | status == glpkNoFeasible = Infeasible
   | status == glpkUnbounded  = Unbounded
+  | status == glpkUndefined  = Infeasible
   | otherwise                = Error
 
 -- | Write out the current formulation to a file.

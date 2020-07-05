@@ -1,5 +1,12 @@
 # Changelog for math-programming-glpk
 
+## [0.4.1] -- 5 July 2020
+
+### Fixed
+
+- Infeasible problems now produce an `Infeasible` status rather than
+  an `Error` status.
+
 ## [0.4.0] -- 5 July 2020
 
 ### Changed
