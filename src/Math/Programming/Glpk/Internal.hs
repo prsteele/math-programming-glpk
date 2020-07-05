@@ -79,7 +79,6 @@ instance LPMonad Glpk where
   getTimeout = getTimeout'
   setTimeout = setTimeout'
   optimizeLP = optimizeLP'
-  writeFormulation = writeFormulation'
 
 instance IPMonad Glpk where
   optimizeIP = optimizeIP'
@@ -218,6 +217,9 @@ addVariable' = do
   problem <- askProblem
   variable <- liftIO $ do
     column <- glp_add_cols problem 1
+
+    glp_set_col_bnds problem column glpkFree 0 0
+
     columnRef <- newIORef column
     return $ NamedRef (fromIntegral column) columnRef
   register askVariablesRef variable
@@ -251,7 +253,7 @@ addConstraint' (Inequality ordering lhs rhs) =
     constraintType = case ordering of
       LT -> glpkLT
       GT -> glpkGT
-      EQ -> glpkBounded
+      EQ -> glpkFixed
 
     constraintRhs :: CDouble
     constraintRhs = realToFrac (negate constant)
@@ -524,8 +526,9 @@ solutionStatus status
   | status == glpkUnbounded  = Unbounded
   | otherwise                = Error
 
-writeFormulation' :: FilePath -> Glpk ()
-writeFormulation' fileName = do
+-- | Write out the current formulation to a file.
+writeFormulation :: FilePath -> Glpk ()
+writeFormulation fileName = do
   problem <- askProblem
   _ <- liftIO $ withCString fileName (glp_write_lp problem nullPtr)
   return ()

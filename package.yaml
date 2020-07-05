@@ -1,5 +1,5 @@
 name:                math-programming-glpk
-version:             0.3.0
+version:             0.4.0
 github:              "prsteele/math-programming-glpk"
 license:             BSD3
 author:              "Patrick Steele"
@@ -24,7 +24,7 @@ dependencies:
   - glpk-headers >= 0.4.0 && < 0.5
   - mtl
   - containers
-  - math-programming >= 0.3.0 && < 0.4
+  - math-programming >= 0.4.0 && < 0.5
   - text
 
 library:
@@ -42,7 +42,7 @@ tests:
       - glpk
     dependencies:
       - math-programming-glpk
-      - math-programming-tests >= 0.3.0 && < 0.4
+      - math-programming-tests >= 0.4.0 && < 0.5
       - tasty
       - tasty-discover
       - tasty-hunit

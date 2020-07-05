@@ -4,6 +4,7 @@
 module Math.Programming.Glpk
   ( Glpk
   , runGlpk
+  , writeFormulation
   -- ** Controlling GLPK behavior
   -- $settings
   , GlpkEnv
