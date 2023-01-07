@@ -1,5 +1,3 @@
-# math-programming-glpk: A GLPK backend to the math-programming library
+# This repository is archived
 
-This package provides an interface to the
-[GLPK](https://www.gnu.org/software/glpk/) LP and MIP solver for the
-[`math-programming`](https://github.com/prsteele/math-programming) package.
+Development has moved to https://github.com/prsteele/math-programming.
